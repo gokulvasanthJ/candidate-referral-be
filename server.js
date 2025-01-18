@@ -4,14 +4,14 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
+require('dotenv').config();  // To load environment variables from .env file
 
-// Set up Express app
 const app = express();
-app.use(cors()); // Allow requests from different origins
-app.use(bodyParser.json()); // Parse incoming JSON requests
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve static files for uploaded resumes
+app.use(cors());
+app.use(bodyParser.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Set up Multer for file storage
+// Multer setup for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'uploads/');
@@ -23,29 +23,31 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/candidateDB', {
+// MongoDB Atlas Connection
+mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
+}).then(() => {
+  console.log('MongoDB connected successfully!');
+}).catch((error) => {
+  console.error('MongoDB connection error:', error);
 });
 
-// Define Candidate Schema with new fields
 const candidateSchema = new mongoose.Schema({
   name: String,
   email: String,
   phoneNumber: String,
   jobTitle: String,
   status: { type: String, default: 'Pending' },
-  resumeFileUrl: String, // Store the URL of the uploaded file
+  resumeFileUrl: String,
 });
 
-// Create Candidate Model
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
-// POST route to submit referral form
+// API route to create a referral
 app.post('/api/referral', upload.single('resume'), async (req, res) => {
   const { name, email, phoneNumber, jobTitle, status } = req.body;
-  const resumeFileUrl = req.file ? `/uploads/${req.file.filename}` : null; // Get resume file URL
+  const resumeFileUrl = req.file ? `/uploads/${req.file.filename}` : null;
 
   const newCandidate = new Candidate({
     name,
@@ -64,7 +66,7 @@ app.post('/api/referral', upload.single('resume'), async (req, res) => {
   }
 });
 
-// GET route to get all referred candidates
+// API route to get all candidates
 app.get('/api/candidates', async (req, res) => {
   try {
     const candidates = await Candidate.find();
@@ -74,7 +76,7 @@ app.get('/api/candidates', async (req, res) => {
   }
 });
 
-// PUT route to update candidate status
+// API route to update a candidate
 app.put('/api/candidates/:id', upload.single('resume'), async (req, res) => {
   try {
     const candidate = await Candidate.findById(req.params.id);
@@ -99,7 +101,7 @@ app.put('/api/candidates/:id', upload.single('resume'), async (req, res) => {
   }
 });
 
-// DELETE route to delete a candidate
+// API route to delete a candidate
 app.delete('/api/candidates/:id', async (req, res) => {
   try {
     const candidate = await Candidate.findByIdAndDelete(req.params.id);
